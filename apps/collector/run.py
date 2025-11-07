@@ -63,5 +63,9 @@ async def loop_collect(interval: int = 60):
             except Exception:
                 await asyncio.sleep(interval)
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the collector CLI."""
     asyncio.run(loop_collect())
+
+if __name__ == "__main__":
+    main()

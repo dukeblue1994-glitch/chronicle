@@ -35,3 +35,8 @@ def event(cluster_id: str):
         raise HTTPException(status_code=404, detail="cluster not found")
     summary = summarize(docs, max_sentences=5)
     return {"cluster_id": cluster_id, "summary": summary, "docs": docs}
+
+def main():
+    """Entry point for the API CLI."""
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

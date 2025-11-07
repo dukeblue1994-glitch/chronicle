@@ -24,7 +24,71 @@ Chronicle is a production-ready event detection system that transforms noisy rea
 - **FastAPI**: High-performance async REST API with automatic OpenAPI documentation
 - **Docker Compose**: Single-command deployment with isolated collector and API services
 
+## Installation
+
+**Option 2: Manual Setup**
+```bash
+**Option 3: From Source**
+```bash
+# 1) Clone and install
+git clone https://github.com/dukeblue1994-glitch/chronicle.git
+cd chronicle
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2) Start the collector
+python apps/collector/run.py
+
+# 3) Start the API
+python apps/api/main.py
+
+# 4) Open API docs at http://127.0.0.1:8000/docs
+```
+
+## API UsageFrom Source**
+pip install chronicle-events
+```
+
+### From GitHub
+```bash
+pip install git+https://github.com/dukeblue1994-glitch/chronicle.git
+```
+
+### For Development
+```bash
+git clone https://github.com/dukeblue1994-glitch/chronicle.git
+cd chronicle
+pip install -e ".[dev]"
+```
+
 ## Quick start
+
+### Using the Package
+```python
+from chronicle.nlp import encode
+from chronicle.cluster import deduplicate, cluster_embeddings
+from chronicle.timeline import summarize
+
+# Your documents
+docs = ["doc 1 text", "doc 2 text", ...]
+
+# Deduplicate
+rep_indices = deduplicate(docs, threshold=0.85)
+
+# Embed and cluster
+embeddings = encode(docs)
+labels, probs = cluster_embeddings(embeddings, min_cluster_size=3)
+```
+
+### Running the Full Application
+
+**Option 1: Docker Compose (Recommended)**
+```bash
+docker-compose up
+# API available at http://localhost:8000/docs
+```
+
+**Option 2: Manual Setup**
 
 ```bash
 # 1) Create venv and install
@@ -43,9 +107,27 @@ uvicorn apps.api.main:app --reload
 
 ## Endpoints
 
+## API Usage
+
+### Endpoints
+
 - `GET /events` — Current event clusters ranked by size and confidence, with extractive summaries
 - `GET /events/{cluster_id}` — Detailed event view with all associated documents and metadata
 - `GET /health` — System health check
+
+### Example Response
+```json
+{
+  "cluster_id": "ev-a3f5c9d2e1b8f4a6",
+  "n_docs": 7,
+  "score": 0.92,
+  "summary": "New AI model achieves breakthrough performance...",
+  "sample": [
+    {"title": "GPT-5 Released", "url": "https://..."},
+    {"title": "OpenAI Announces Major Update", "url": "https://..."}
+  ]
+}
+```
 
 ## Technical Implementation
 

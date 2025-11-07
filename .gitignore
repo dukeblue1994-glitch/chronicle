@@ -22,6 +22,7 @@ wheels/
 
 # Virtual environments
 .venv/
+.venv-test/
 venv/
 ENV/
 env/

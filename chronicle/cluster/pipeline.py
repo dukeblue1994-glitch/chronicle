@@ -37,6 +37,10 @@ def run_batch():
             db.upsert_cluster(conn, doc_id, cid, score)
     return len(clusters)
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the clustering CLI."""
     n = run_batch()
     print(f"clustered: {n}")
+
+if __name__ == "__main__":
+    main()
