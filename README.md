@@ -1,7 +1,7 @@
 # Chronicle — Real‑time Event Clustering and Timeline Builder
 
 [![CI](https://github.com/dukeblue1994-glitch/chronicle/actions/workflows/ci.yml/badge.svg)](https://github.com/dukeblue1994-glitch/chronicle/actions/workflows/ci.yml)
-[![PyPI version](https://badge.fury.io/py/chronicle-events.svg)](https://badge.fury.io/py/chronicle-events)
+[![PyPI version](https://img.shields.io/pypi/v/chronicle-events.svg)](https://pypi.org/project/chronicle-events/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/chronicle-events.svg)](https://pypi.org/project/chronicle-events/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
