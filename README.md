@@ -1,5 +1,11 @@
 # Chronicle — Real‑time Event Clustering and Timeline Builder
 
+[![CI](https://github.com/dukeblue1994-glitch/chronicle/actions/workflows/ci.yml/badge.svg)](https://github.com/dukeblue1994-glitch/chronicle/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/chronicle-events.svg)](https://badge.fury.io/py/chronicle-events)
+[![Python Versions](https://img.shields.io/pypi/pyversions/chronicle-events.svg)](https://pypi.org/project/chronicle-events/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 > **Intelligent news aggregation powered by semantic embeddings, MinHash deduplication, and adaptive clustering algorithms.**
 
 Chronicle is a production-ready event detection system that transforms noisy real-time news streams into coherent, clustered timelines. Built for scale and accuracy, it combines modern NLP techniques with robust ML pipelines to automatically discover trending topics and extract signal from noise.
@@ -154,3 +160,91 @@ uvicorn apps.api.main:app --reload
 
 ## Data Source
 - **Hacker News**: Top stories API with full article text extraction when available
+
+## Configuration
+
+Chronicle can be configured via environment variables. Copy `.env.example` to `.env` and customize:
+
+```bash
+# Key configuration options
+CHRONICLE_COLLECTOR_INTERVAL=60  # Fetch interval in seconds
+CHRONICLE_CLUSTER_MIN_SIZE=3     # Minimum documents per cluster
+CHRONICLE_DEDUP_THRESHOLD=0.85   # Similarity threshold for deduplication
+CHRONICLE_LOG_LEVEL=INFO         # Logging level
+```
+
+See `.env.example` for all available options.
+
+## Development
+
+### Setup
+```bash
+git clone https://github.com/dukeblue1994-glitch/chronicle.git
+cd chronicle
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Running Tests
+```bash
+pytest                    # Run all tests
+pytest --cov             # With coverage
+pytest tests/test_api.py # Specific test file
+```
+
+### Code Quality
+```bash
+black chronicle apps tests  # Format code
+ruff check chronicle apps   # Lint code
+mypy chronicle apps         # Type check
+```
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Quick Contribution Guide
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes with tests
+4. Run quality checks (`pytest && black . && ruff check .`)
+5. Commit (`git commit -m 'Add amazing feature'`)
+6. Push and create a Pull Request
+
+## Roadmap
+
+- [ ] Additional data sources (Reddit, Twitter, RSS)
+- [ ] Real-time WebSocket API for live updates
+- [ ] Event evolution tracking over time
+- [ ] Advanced trend detection
+- [ ] Grafana dashboards for monitoring
+- [ ] Multi-language support
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Citation
+
+If you use Chronicle in your research or project, please cite:
+
+```bibtex
+@software{chronicle2025,
+  title = {Chronicle: Real-time Event Clustering and Timeline Builder},
+  author = {Anderson, Nick},
+  year = {2025},
+  url = {https://github.com/dukeblue1994-glitch/chronicle}
+}
+```
+
+## Acknowledgments
+
+- Sentence-Transformers for embeddings
+- HDBSCAN for density-based clustering
+- MinHash LSH for efficient deduplication
+- FastAPI for the API framework
+- Hacker News for the data source
+
+---
+
+**Built with ❤️ for discovering what's trending in tech**

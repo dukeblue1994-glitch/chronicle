@@ -27,6 +27,11 @@ venv/
 ENV/
 env/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 # IDEs
 .vscode/
 .idea/
@@ -39,8 +44,17 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+# Logs
+*.log
+logs/
 
-# OS
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
 .DS_Store
 Thumbs.db
 
