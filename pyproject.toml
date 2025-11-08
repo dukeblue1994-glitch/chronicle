@@ -73,6 +73,7 @@ Issues = "https://github.com/dukeblue1994-glitch/chronicle/issues"
 chronicle-collector = "apps.collector.run:main"
 chronicle-api = "apps.api.main:main"
 chronicle-cluster = "chronicle.cluster.pipeline:main"
+chronicle-scheduler = "apps.scheduler.run:main"
 
 [tool.setuptools.packages.find]
 include = ["chronicle*", "apps*"]

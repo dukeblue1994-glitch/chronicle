@@ -1,6 +1,11 @@
 """Tests for API endpoints."""
 import pytest
+import os
 from fastapi.testclient import TestClient
+
+# Set test environment
+os.environ['CHRONICLE_LOG_LEVEL'] = 'ERROR'
+
 from apps.api.main import app
 from chronicle.storage import db
 
