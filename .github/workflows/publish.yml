@@ -11,7 +11,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/chronicle-events
     permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: AgEIcHlwaS5vcmcCJDMzZTRhYjExLWRkN2MtNDk4Ny05ZWFiLWFlZjEzYmNkZDM2NgACGFsxLFsiY2hyb25pY2xlLWV2ZW50cyJdXQACLFsyLFsiNDVkMDgxYTQtMTE1Mi00M2E1LWIwMWItZGEyMTQxMzY0MTIzIl1dAAAGIOe4IYWx8t1714_BSYsMVj_VsLe9y65b7MhBDUgGVnhDshing
     
     steps:
     - uses: actions/checkout@v4
