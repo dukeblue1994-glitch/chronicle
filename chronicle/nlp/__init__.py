@@ -1,3 +1,5 @@
 """Chronicle NLP module for text embeddings."""
 
-__all__ = ["embedding"]
+from chronicle.nlp.embedding import encode
+
+__all__ = ["encode"]

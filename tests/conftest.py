@@ -2,9 +2,8 @@
 
 import os
 import tempfile
+
 import pytest
-import sqlite3
-from pathlib import Path
 
 
 @pytest.fixture
@@ -13,12 +12,24 @@ def temp_db():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".db", delete=False) as f:
         db_path = f.name
 
-    # Set environment variable
-    os.environ["CHRONICLE_DB"] = db_path
+    previous_db_path = os.environ.get("CHRONICLE_DB_PATH")
+    previous_legacy_db = os.environ.get("CHRONICLE_DB")
+
+    os.environ["CHRONICLE_DB_PATH"] = db_path
+    os.environ.pop("CHRONICLE_DB", None)
 
     yield db_path
 
-    # Cleanup
+    if previous_db_path is None:
+        os.environ.pop("CHRONICLE_DB_PATH", None)
+    else:
+        os.environ["CHRONICLE_DB_PATH"] = previous_db_path
+
+    if previous_legacy_db is None:
+        os.environ.pop("CHRONICLE_DB", None)
+    else:
+        os.environ["CHRONICLE_DB"] = previous_legacy_db
+
     try:
         os.unlink(db_path)
     except FileNotFoundError:

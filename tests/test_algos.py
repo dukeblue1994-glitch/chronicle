@@ -1,12 +1,12 @@
 """Tests for clustering and deduplication algorithms."""
 
-import pytest
 import numpy as np
+
 from chronicle.cluster.algos import (
-    deduplicate,
-    cluster_embeddings,
-    minhash_signature,
     _shingles,
+    cluster_embeddings,
+    deduplicate,
+    minhash_signature,
 )
 
 

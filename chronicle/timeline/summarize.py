@@ -1,8 +1,10 @@
 from __future__ import annotations
-from typing import List, Dict
+
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
+from typing import Dict, List
+
 import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 def summarize(docs: List[Dict], max_sentences: int = 3) -> str:

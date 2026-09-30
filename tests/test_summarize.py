@@ -1,6 +1,5 @@
 """Tests for summarization functionality."""
 
-import pytest
 from chronicle.timeline.summarize import summarize
 
 

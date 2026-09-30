@@ -1,20 +1,24 @@
 from __future__ import annotations
+
 import asyncio
 import time
-import logging
+
 import httpx
 from bs4 import BeautifulSoup
 from readability import Document
-from chronicle.storage import db
+
 from chronicle.config import settings
+from chronicle.logging import (
+    ErrorCategory,
+    get_logger,
+    log_exception,
+    log_metric,
+    log_with_context,
+)
+from chronicle.storage import db
 from chronicle.utils import retry_with_backoff
 
-# Set up logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 HN_TOP = "https://hacker-news.firebaseio.com/v0/topstories.json"
 HN_ITEM = "https://hacker-news.firebaseio.com/v0/item/{id}.json"
@@ -23,9 +27,9 @@ HN_ITEM = "https://hacker-news.firebaseio.com/v0/item/{id}.json"
 @retry_with_backoff(max_retries=3, exceptions=(httpx.HTTPError,))
 async def fetch_json(client: httpx.AsyncClient, url: str):
     """Fetch JSON from URL with retry logic."""
-    r = await client.get(url, timeout=settings.collector_timeout)
-    r.raise_for_status()
-    return r.json()
+    response = await client.get(url, timeout=settings.collector_timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 def extract_text(html: str) -> str:
@@ -35,26 +39,44 @@ def extract_text(html: str) -> str:
         content = doc.summary()
         soup = BeautifulSoup(content, "lxml")
         return soup.get_text(" ", strip=True)
-    except Exception as e:
-        logger.debug(f"Readability extraction failed: {e}")
+    except Exception as exc:
+        log_with_context(
+            logger,
+            "DEBUG",
+            "Readability extraction failed",
+            error=str(exc),
+        )
         try:
             soup = BeautifulSoup(html, "lxml")
             return soup.get_text(" ", strip=True)
-        except Exception as e:
-            logger.debug(f"BeautifulSoup extraction failed: {e}")
+        except Exception as fallback_exc:
+            log_with_context(
+                logger,
+                "DEBUG",
+                "BeautifulSoup extraction failed",
+                error=str(fallback_exc),
+            )
             return ""
 
 
 async def fetch_article_text(client: httpx.AsyncClient, url: str) -> str:
     """Fetch and extract article text with error handling."""
     try:
-        r = await client.get(
-            url, timeout=settings.collector_timeout, follow_redirects=True
+        response = await client.get(
+            url,
+            timeout=settings.collector_timeout,
+            follow_redirects=True,
         )
-        r.raise_for_status()
-        return extract_text(r.text)
-    except Exception as e:
-        logger.debug(f"Failed to fetch article from {url}: {e}")
+        response.raise_for_status()
+        return extract_text(response.text)
+    except Exception as exc:
+        log_with_context(
+            logger,
+            "DEBUG",
+            "Failed to fetch article",
+            url=url,
+            error=str(exc),
+        )
         return ""
 
 
@@ -64,25 +86,38 @@ async def loop_collect(interval: int | None = None):
         interval = settings.collector_interval
 
     logger.info(
-        f"Starting collector (interval={interval}s, limit={settings.collector_story_limit})"
+        "Starting collector (interval=%ss, limit=%s)",
+        interval,
+        settings.collector_story_limit,
     )
+
     conn = db.connect()
+    consecutive_failures = 0
 
     async with httpx.AsyncClient() as client:
         iteration = 0
         while True:
             iteration += 1
+            processed = 0
+            errors = 0
+
             try:
-                logger.info(f"Fetching top stories (iteration {iteration})")
+                logger.info("Fetching top stories (iteration %s)", iteration)
                 top = await fetch_json(client, HN_TOP)
                 logger.info(
-                    f"Found {len(top)} stories, processing top {settings.collector_story_limit}"
+                    "Found %s stories, processing top %s",
+                    len(top),
+                    settings.collector_story_limit,
                 )
 
-                processed = 0
-                errors = 0
-
                 for item_id in top[: settings.collector_story_limit]:
+                    if errors >= settings.collector_max_story_errors:
+                        logger.warning(
+                            "Reached story failure budget (%s); ending cycle early",
+                            settings.collector_max_story_errors,
+                        )
+                        break
+
                     try:
                         item = await fetch_json(client, HN_ITEM.format(id=item_id))
                         if not item or item.get("type") != "story":
@@ -106,22 +141,56 @@ async def loop_collect(interval: int | None = None):
 
                         db.insert_doc(conn, doc)
                         processed += 1
-                        logger.debug(f"Stored story {item_id}: {title[:50]}")
 
-                    except Exception as e:
+                    except Exception as exc:
                         errors += 1
-                        logger.warning(f"Failed to process story {item_id}: {e}")
+                        log_with_context(
+                            logger,
+                            "WARNING",
+                            "Failed to process story",
+                            item_id=item_id,
+                            error=str(exc),
+                        )
 
+                consecutive_failures = 0
+                log_metric(
+                    logger,
+                    "collector.docs_processed",
+                    processed,
+                    iteration=iteration,
+                )
+                log_metric(
+                    logger,
+                    "collector.story_errors",
+                    errors,
+                    iteration=iteration,
+                )
                 logger.info(
-                    f"Iteration {iteration} complete: {processed} stored, {errors} errors"
+                    "Iteration %s complete: %s stored, %s errors",
+                    iteration,
+                    processed,
+                    errors,
                 )
 
-            except Exception as e:
-                logger.error(
-                    f"Collection iteration {iteration} failed: {e}", exc_info=True
+            except Exception as exc:
+                consecutive_failures += 1
+                log_exception(
+                    logger,
+                    ErrorCategory.NETWORK,
+                    "Collection iteration failed",
+                    exc,
+                    iteration=iteration,
+                    consecutive_failures=consecutive_failures,
                 )
 
-            logger.debug(f"Sleeping for {interval}s")
+                if consecutive_failures >= settings.collector_max_consecutive_failures:
+                    logger.warning(
+                        "Failure threshold reached (%s); cooling down for %ss",
+                        settings.collector_max_consecutive_failures,
+                        settings.collector_failure_cooldown,
+                    )
+                    await asyncio.sleep(settings.collector_failure_cooldown)
+
             await asyncio.sleep(interval)
 
 
@@ -131,8 +200,8 @@ def main():
         asyncio.run(loop_collect())
     except KeyboardInterrupt:
         logger.info("Collector stopped by user")
-    except Exception as e:
-        logger.error(f"Collector crashed: {e}", exc_info=True)
+    except Exception as exc:
+        log_exception(logger, ErrorCategory.SYSTEM, "Collector crashed", exc)
         raise
 
 

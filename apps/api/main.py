@@ -1,21 +1,70 @@
 from __future__ import annotations
-import logging
-from fastapi import FastAPI, HTTPException, Query
+
+from typing import Any, Literal
+
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from chronicle import __version__
+from chronicle.config import settings
+from chronicle.logging import ErrorCategory, get_logger, log_exception
 from chronicle.storage import db
 from chronicle.timeline.summarize import summarize
-from chronicle.config import settings
 
-# Set up logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+class EndpointMap(BaseModel):
+    health: str
+    events: str
+    event_detail: str
+
+
+class RootResponse(BaseModel):
+    name: str
+    version: str
+    description: str
+    docs: str
+    endpoints: EndpointMap
+
+
+class HealthResponse(BaseModel):
+    ok: bool
+    version: str
+
+
+class EventSample(BaseModel):
+    title: str | None
+    url: str | None
+
+
+class EventSummary(BaseModel):
+    cluster_id: str
+    n_docs: int
+    score: float
+    summary: str
+    sample: list[EventSample]
+
+
+class EventDoc(BaseModel):
+    id: int
+    title: str | None
+    url: str | None
+    text: str | None
+    ts: int
+    score: float
+
+
+class EventDetail(BaseModel):
+    cluster_id: str
+    summary: str
+    docs: list[EventDoc]
+
 
 app = FastAPI(
-    title="Chronicle API",
-    version="0.1.0",
+    title=f"{settings.app_name} API",
+    version=__version__,
     description="Real-time event clustering and timeline builder API",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -23,60 +72,65 @@ app = FastAPI(
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler for unhandled errors."""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    log_exception(
+        logger,
+        ErrorCategory.API,
+        "Unhandled API exception",
+        exc,
+        path=str(request.url.path),
+        method=request.method,
+    )
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-@app.get("/", tags=["System"])
-def root():
+@app.get("/", tags=["System"], response_model=RootResponse)
+def root() -> RootResponse:
     """Root endpoint with API information."""
-    return {
-        "name": "Chronicle API",
-        "version": "0.1.0",
-        "description": "Real-time event clustering and timeline builder",
-        "docs": "/docs",
-        "endpoints": {
-            "health": "/health",
-            "events": "/events",
-            "event_detail": "/events/{cluster_id}",
-        },
-    }
+    return RootResponse(
+        name=f"{settings.app_name} API",
+        version=__version__,
+        description="Real-time event clustering and timeline builder",
+        docs="/docs",
+        endpoints=EndpointMap(
+            health="/health",
+            events="/events",
+            event_detail="/events/{cluster_id}",
+        ),
+    )
 
 
-@app.get("/health", tags=["System"])
-def health():
+@app.get("/health", tags=["System"], response_model=HealthResponse)
+def health() -> HealthResponse:
     """Health check endpoint."""
-    return {"ok": True, "version": "0.1.0"}
+    return HealthResponse(ok=True, version=__version__)
 
 
-@app.get("/events", tags=["Events"])
+@app.get("/events", tags=["Events"], response_model=list[EventSummary])
 def events(
     limit: int = Query(
-        100, ge=1, le=1000, description="Maximum number of events to return"
+        100,
+        ge=1,
+        le=1000,
+        description="Maximum number of events to return",
     ),
     min_docs: int = Query(2, ge=1, description="Minimum documents per cluster"),
-    sort_by: str = Query(
-        "size", regex="^(size|score)$", description="Sort by size or score"
+    sort_by: Literal["size", "score"] = Query(
+        "size", description="Sort by size or score"
     ),
-):
-    """
-    Get all event clusters with summaries.
-
-    Returns a list of event clusters ranked by size and confidence,
-    with extractive summaries and sample documents.
-    """
+) -> list[EventSummary]:
+    """Get all event clusters with summaries."""
     try:
         conn = db.connect()
-        clusters = db.get_clusters(conn)
-        conn.close()
+        try:
+            clusters = db.get_clusters(conn)
+        finally:
+            conn.close()
 
-        out = []
+        out: list[dict[str, Any]] = []
         for cid, payload in clusters.items():
             docs = payload["docs"]
-
-            # Filter by minimum docs
             if len(docs) < min_docs:
                 continue
 
@@ -85,55 +139,57 @@ def events(
                 {
                     "cluster_id": cid,
                     "n_docs": len(docs),
-                    "score": payload["score"],
+                    "score": float(payload["score"]),
                     "summary": summary,
                     "sample": [
-                        {"title": d["title"], "url": d["url"]} for d in docs[:3]
+                        {"title": d.get("title"), "url": d.get("url")} for d in docs[:3]
                     ],
                 }
             )
 
-        # Sort
         if sort_by == "size":
-            out.sort(key=lambda x: (x["n_docs"], x["score"]), reverse=True)
+            out.sort(key=lambda x: (-x["n_docs"], -x["score"], x["cluster_id"]))
         else:
-            out.sort(key=lambda x: x["score"], reverse=True)
+            out.sort(key=lambda x: (-x["score"], -x["n_docs"], x["cluster_id"]))
 
-        # Limit
         out = out[:limit]
+        logger.info("Returned %s events", len(out))
+        return [EventSummary(**event) for event in out]
 
-        logger.info(f"Returned {len(out)} events")
-        return out
-
-    except Exception as e:
-        logger.error(f"Failed to get events: {e}", exc_info=True)
+    except Exception as exc:
+        log_exception(logger, ErrorCategory.API, "Failed to get events", exc)
         raise HTTPException(status_code=500, detail="Failed to retrieve events")
 
 
-@app.get("/events/{cluster_id}", tags=["Events"])
-def event(cluster_id: str):
-    """
-    Get detailed information about a specific event cluster.
-
-    Returns the cluster with all associated documents and a detailed summary.
-    """
+@app.get("/events/{cluster_id}", tags=["Events"], response_model=EventDetail)
+def event(cluster_id: str) -> EventDetail:
+    """Get detailed information about a specific event cluster."""
     try:
         conn = db.connect()
-        docs = db.get_cluster_docs(conn, cluster_id)
-        conn.close()
+        try:
+            docs = db.get_cluster_docs(conn, cluster_id)
+        finally:
+            conn.close()
 
         if not docs:
             raise HTTPException(status_code=404, detail="Cluster not found")
 
         summary = summarize(docs, max_sentences=settings.summary_detail_sentences)
+        logger.info("Returned cluster %s with %s docs", cluster_id, len(docs))
 
-        logger.info(f"Returned cluster {cluster_id} with {len(docs)} docs")
-        return {"cluster_id": cluster_id, "summary": summary, "docs": docs}
+        normalized_docs = [EventDoc(**doc) for doc in docs]
+        return EventDetail(cluster_id=cluster_id, summary=summary, docs=normalized_docs)
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Failed to get cluster {cluster_id}: {e}", exc_info=True)
+    except Exception as exc:
+        log_exception(
+            logger,
+            ErrorCategory.API,
+            "Failed to get cluster",
+            exc,
+            cluster_id=cluster_id,
+        )
         raise HTTPException(status_code=500, detail="Failed to retrieve cluster")
 
 
@@ -141,7 +197,7 @@ def main():
     """Entry point for the API CLI."""
     import uvicorn
 
-    logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
+    logger.info("Starting API server on %s:%s", settings.api_host, settings.api_port)
     uvicorn.run(
         app,
         host=settings.api_host,

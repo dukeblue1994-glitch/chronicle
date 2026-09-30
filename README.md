@@ -164,6 +164,8 @@ Chronicle can be configured via environment variables. Copy `.env.example` to `.
 CHRONICLE_COLLECTOR_INTERVAL=60  # Fetch interval in seconds
 CHRONICLE_CLUSTER_MIN_SIZE=3     # Minimum documents per cluster
 CHRONICLE_DEDUP_THRESHOLD=0.85   # Similarity threshold for deduplication
+CHRONICLE_DB_PATH=data/chronicle.db  # SQLite path
+CHRONICLE_COLLECTOR_MAX_STORY_ERRORS=15  # Per-cycle failure budget
 CHRONICLE_LOG_LEVEL=INFO         # Logging level
 ```
 

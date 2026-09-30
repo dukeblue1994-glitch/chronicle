@@ -1,3 +1,3 @@
 """Chronicle apps module."""
 
-__all__ = ["api", "collector"]
+__all__ = ["api", "collector", "scheduler"]

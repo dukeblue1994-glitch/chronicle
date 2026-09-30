@@ -1,10 +1,12 @@
 """Configuration management for Chronicle."""
 
 from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Literal
-from pydantic_settings import BaseSettings
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -29,6 +31,11 @@ class Settings(BaseSettings):
     collector_interval: int = 60  # seconds between HN fetches
     collector_story_limit: int = 60  # number of stories to fetch
     collector_timeout: int = 20  # HTTP timeout in seconds
+    collector_max_story_errors: int = 15  # max story errors before ending a cycle
+    collector_max_consecutive_failures: int = (
+        3  # consecutive failed cycles before cooldown
+    )
+    collector_failure_cooldown: int = 120  # seconds to wait after repeated failures
 
     # Clustering
     cluster_batch_size: int = 400  # documents to process in batch
@@ -53,11 +60,12 @@ class Settings(BaseSettings):
     log_format: Literal["text", "json"] = "text"
     log_file: str | None = None
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        env_prefix = "CHRONICLE_"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="CHRONICLE_",
+        case_sensitive=False,
+    )
 
 
 # Global settings instance
@@ -70,7 +78,11 @@ def get_settings() -> Settings:
 
 
 def get_db_path() -> Path:
-    """Get database path, creating parent directory if needed."""
-    db_path = Path(settings.db_path)
+    """Get database path, creating parent directory if needed.
+
+    Supports CHRONICLE_DB_PATH and legacy CHRONICLE_DB environment variables.
+    """
+    env_db_path = os.getenv("CHRONICLE_DB_PATH") or os.getenv("CHRONICLE_DB")
+    db_path = Path(env_db_path or settings.db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return db_path

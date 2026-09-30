@@ -11,23 +11,49 @@ jobs:
       name: pypi
       url: https://pypi.org/p/chronicle-events
     permissions:
-      id-token: AgEIcHlwaS5vcmcCJDMzZTRhYjExLWRkN2MtNDk4Ny05ZWFiLWFlZjEzYmNkZDM2NgACGFsxLFsiY2hyb25pY2xlLWV2ZW50cyJdXQACLFsyLFsiNDVkMDgxYTQtMTE1Mi00M2E1LWIwMWItZGEyMTQxMzY0MTIzIl1dAAAGIOe4IYWx8t1714_BSYsMVj_VsLe9y65b7MhBDUgGVnhDshing
-    
+      id-token: write
+      contents: read
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
-    
-    - name: Build package
-      run: python -m build
-    
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import tomllib
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit(f"Release tag must look like vX.Y.Z, got: {tag}")
+
+          version = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          if version != tag.lstrip("v"):
+              raise SystemExit(f"pyproject version {version} does not match tag {tag}")
+
+          changelog = pathlib.Path("CHANGELOG.md").read_text()
+          if f"## [{version}]" not in changelog:
+              raise SystemExit(f"CHANGELOG.md is missing section for version {version}")
+
+          print("Release metadata validated")
+          PY
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

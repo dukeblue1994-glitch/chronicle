@@ -1,7 +1,8 @@
 """Tests for API endpoints."""
 
-import pytest
 import os
+
+import pytest
 from fastapi.testclient import TestClient
 
 # Set test environment
@@ -24,7 +25,9 @@ class TestAPIEndpoints:
         """Test health check endpoint."""
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"ok": True}
+        payload = response.json()
+        assert payload["ok"] is True
+        assert "version" in payload
 
     def test_events_endpoint_empty(self, client):
         """Test events endpoint with no data."""
