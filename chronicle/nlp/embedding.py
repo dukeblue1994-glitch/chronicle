@@ -35,7 +35,8 @@ def _ensure_sbert():
             _model_name = settings.embedding_model
         except Exception as exc:
             logger.warning(
-                "Failed to load sentence-transformer '%s'; falling back to TF-IDF: %s",
+                "Failed to load sentence-transformer '%s'; falling back to TF-IDF. "
+                "Install optional embeddings with chronicle-events[embeddings]: %s",
                 settings.embedding_model,
                 exc,
             )

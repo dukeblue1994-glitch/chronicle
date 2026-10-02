@@ -47,11 +47,13 @@ dependencies = [
     "datasketch>=1.6.5,<2.0.0",
     "pydantic>=2.9.2,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
-    "sentence-transformers>=3.0.1,<4.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
+embeddings = [
+    "sentence-transformers>=6.1.0,<7.0.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",

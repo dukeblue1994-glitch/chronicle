@@ -37,6 +37,11 @@ Chronicle is a production-ready event detection system that transforms noisy rea
 pip install chronicle-events
 ```
 
+### Optional Semantic Embeddings (Sentence-Transformers)
+```bash
+pip install "chronicle-events[embeddings]"
+```
+
 ### From GitHub
 ```bash
 pip install git+https://github.com/dukeblue1994-glitch/chronicle.git
