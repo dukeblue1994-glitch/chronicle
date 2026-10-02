@@ -29,7 +29,12 @@ def deduplicate(
         raise ValueError("threshold must be greater than zero and at most one")
     if num_perm < 16:
         raise ValueError("num_perm must be at least 16")
-    lsh = MinHashLSH(threshold=min(threshold, 0.99), num_perm=num_perm)
+    try:
+        lsh = MinHashLSH(threshold=threshold, num_perm=num_perm)
+    except ValueError:
+        # Very high thresholds and short signatures can select only one band.
+        # Use two bands for candidate retrieval; exact overlap still decides matches.
+        lsh = MinHashLSH(num_perm=num_perm, params=(2, num_perm // 2))
     tokens = [set(title.lower().split()) for title in titles]
     representatives: List[int] = []
     for i, title in enumerate(titles):

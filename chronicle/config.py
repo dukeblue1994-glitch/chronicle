@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     dedup_threshold: float = Field(
         default=0.85, gt=0, le=1
     )  # MinHash similarity threshold
-    dedup_num_perm: int = 128  # MinHash permutations
+    dedup_num_perm: int = Field(default=128, ge=16)  # MinHash permutations
 
     # Embeddings
     embedding_backend: Literal["auto", "tfidf", "semantic"] = "auto"

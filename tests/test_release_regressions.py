@@ -231,3 +231,13 @@ def test_offline_demo_creates_three_events(tmp_path, monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("threshold", [0.85, 0.999, 1.0])
+@pytest.mark.parametrize("permutations", [16, 128])
+def test_dedup_high_threshold_and_short_signatures(threshold, permutations):
+    assert algos.deduplicate(
+        ["one two three", "one two three", "entirely different"],
+        threshold=threshold,
+        num_perm=permutations,
+    ) == [0, 0, 2]
