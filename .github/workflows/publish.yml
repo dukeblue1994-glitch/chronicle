@@ -69,5 +69,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Publish tested distributions with Trusted Publishing
+      - name: Publish tested distributions
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PI_PY_TOKEN }}
+          attestations: ${{ secrets.PI_PY_TOKEN == '' }}

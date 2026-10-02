@@ -11,7 +11,7 @@ PyPI accepts a new version number and valid distributions. Uploads cannot replac
 
 ## Publish through GitHub
 
-Create a GitHub release with a new `vX.Y.Z` tag at the verified commit. `publish.yml` validates metadata, reruns CI, builds and tests the distributions, then uploads those exact artifacts with PyPI Trusted Publishing.
+Create a GitHub release with a new `vX.Y.Z` tag at the verified commit. `publish.yml` validates metadata, reruns CI, builds and tests the distributions, then uploads those exact artifacts. It uses the existing `PI_PY_TOKEN` secret when configured, or PyPI Trusted Publishing when no token is configured.
 
 The existing PyPI project should trust:
 
@@ -22,7 +22,7 @@ The existing PyPI project should trust:
 
 Manage this under the existing project's publishing settings. Pending publishers are for projects that do not exist yet.
 
-If Trusted Publishing is unavailable, the manually dispatched **Publish to PyPI (Token fallback)** workflow accepts an existing tag and uses the repository's existing `PI_PY_TOKEN` secret. It runs the same CI before uploading. Never put the token in source files or logs.
+The manually dispatched **Publish to PyPI (Token fallback)** workflow also accepts an existing tag and uses the repository's existing `PI_PY_TOKEN` secret. It runs the same CI before uploading. Never put the token in source files or logs.
 
 The two publishing workflows share a concurrency group. Do not dispatch both for the same version.
 
