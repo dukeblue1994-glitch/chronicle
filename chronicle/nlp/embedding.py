@@ -11,7 +11,7 @@ from chronicle.config import settings
 logger = logging.getLogger(__name__)
 
 _model = None
-_model_name: str | None = None
+_model_name: tuple[str, str] | None = None
 _model_lock = threading.Lock()
 
 
@@ -19,11 +19,17 @@ def _ensure_sbert():
     global _model
     global _model_name
 
-    if _model is not None and _model_name == settings.embedding_model:
+    if _model is not None and _model_name == (
+        settings.embedding_model,
+        settings.embedding_device,
+    ):
         return _model
 
     with _model_lock:
-        if _model is not None and _model_name == settings.embedding_model:
+        if _model is not None and _model_name == (
+            settings.embedding_model,
+            settings.embedding_device,
+        ):
             return _model
 
         try:
@@ -32,8 +38,13 @@ def _ensure_sbert():
             _model = SentenceTransformer(
                 settings.embedding_model, device=settings.embedding_device
             )
-            _model_name = settings.embedding_model
+            _model_name = (settings.embedding_model, settings.embedding_device)
         except Exception as exc:
+            if settings.embedding_backend == "semantic":
+                raise RuntimeError(
+                    "Semantic model unavailable. Install chronicle-events[embeddings] "
+                    "and check model access, or select CHRONICLE_EMBEDDING_BACKEND=tfidf."
+                ) from exc
             logger.warning(
                 "Failed to load sentence-transformer '%s'; falling back to TF-IDF. "
                 "Install optional embeddings with chronicle-events[embeddings]: %s",
@@ -49,9 +60,20 @@ def _ensure_sbert():
 def _encode_tfidf(texts: List[str]) -> np.ndarray:
     from sklearn.feature_extraction.text import TfidfVectorizer
 
-    safe_texts = [(text or "").strip() or "__empty__" for text in texts]
-    vectorizer = TfidfVectorizer(max_features=4096, ngram_range=(1, 2), norm="l2")
-    X = vectorizer.fit_transform(safe_texts).toarray().astype(np.float32, copy=False)
+    safe_texts = [(text or "").strip() for text in texts]
+    vectorizer = TfidfVectorizer(
+        max_features=4096, ngram_range=(1, 2), norm="l2", token_pattern=r"(?u)\b\w+\b"
+    )
+    try:
+        X = (
+            vectorizer.fit_transform(safe_texts)
+            .toarray()
+            .astype(np.float32, copy=False)
+        )
+    except ValueError as exc:
+        if "empty vocabulary" not in str(exc):
+            raise
+        return np.zeros((len(texts), 1), dtype=np.float32)
 
     norms = np.linalg.norm(X, axis=1, keepdims=True)
     norms = np.where(norms == 0.0, 1.0, norms)
@@ -64,7 +86,7 @@ def encode(texts: List[str]) -> np.ndarray:
 
     safe_texts = [(text or "").strip() for text in texts]
 
-    model = _ensure_sbert()
+    model = None if settings.embedding_backend == "tfidf" else _ensure_sbert()
     if model is not None:
         vectors = model.encode(
             safe_texts,

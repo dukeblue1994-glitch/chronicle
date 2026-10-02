@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Chronicle"
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
     environment: Literal["development", "production", "testing"] = "production"
     debug: bool = False
 
@@ -38,15 +39,20 @@ class Settings(BaseSettings):
     collector_failure_cooldown: int = 120  # seconds to wait after repeated failures
 
     # Clustering
-    cluster_batch_size: int = 400  # documents to process in batch
-    cluster_min_size: int = 3  # minimum documents per cluster
+    cluster_batch_size: int = Field(
+        default=400, ge=1, le=10000
+    )  # documents to process in batch
+    cluster_min_size: int = Field(default=3, ge=1)  # minimum documents per cluster
     cluster_schedule: int = 300  # seconds between clustering runs (0 = manual only)
 
     # Deduplication
-    dedup_threshold: float = 0.85  # MinHash similarity threshold
+    dedup_threshold: float = Field(
+        default=0.85, gt=0, le=1
+    )  # MinHash similarity threshold
     dedup_num_perm: int = 128  # MinHash permutations
 
     # Embeddings
+    embedding_backend: Literal["auto", "tfidf", "semantic"] = "auto"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_batch_size: int = 32
     embedding_device: str = "cpu"  # or "cuda" if available

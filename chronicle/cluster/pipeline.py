@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import hashlib
 
-import numpy as np
-
 from chronicle.cluster.algos import cluster_embeddings, deduplicate
 from chronicle.config import settings
 from chronicle.logging import (
@@ -19,8 +17,9 @@ from chronicle.storage import db
 logger = get_logger(__name__)
 
 
-def _cluster_id(vec: np.ndarray) -> str:
-    h = hashlib.sha1(vec.tobytes()).hexdigest()[:16]
+def _cluster_id(doc_ids: list[int]) -> str:
+    identity = ",".join(str(doc_id) for doc_id in sorted(doc_ids))
+    h = hashlib.sha256(identity.encode()).hexdigest()[:16]
     return f"ev-{h}"
 
 
@@ -38,7 +37,7 @@ def run_batch() -> int:
         log_metric(logger, "clustering.docs_input", len(docs))
         logger.info("Processing %s documents", len(docs))
 
-        titles = [d["title"] or "" for d in docs]
+        titles = [d["title"] or d["text"] or "" for d in docs]
         rep = deduplicate(
             titles,
             threshold=settings.dedup_threshold,
@@ -77,13 +76,15 @@ def run_batch() -> int:
 
         logger.info("Found %s clusters", len(clusters))
 
+        assignments: list[tuple[int, str, float]] = []
         for idxs in clusters.values():
-            centroid = X[idxs].mean(axis=0)
-            cid = _cluster_id(centroid)
+            cid = _cluster_id([int(filtered[j]["id"]) for j in idxs])
             for j in idxs:
                 doc_id = int(filtered[j]["id"])
                 score = float(probs[j])
-                db.upsert_cluster(conn, doc_id, cid, score)
+                assignments.append((doc_id, cid, score))
+
+        db.replace_assignments(conn, [int(doc["id"]) for doc in docs], assignments)
 
         log_metric(logger, "clustering.clusters_created", len(clusters))
         logger.info("Clustering complete: %s clusters created", len(clusters))

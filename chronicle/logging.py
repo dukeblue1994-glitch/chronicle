@@ -68,7 +68,7 @@ def setup_logging() -> logging.Logger:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         handler = logging.FileHandler(settings.log_file)
     else:
-        handler = logging.StreamHandler(sys.stdout)
+        handler = logging.StreamHandler(sys.stderr)
 
     handler.setLevel(level)
 
