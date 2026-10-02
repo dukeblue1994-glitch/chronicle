@@ -1,12 +1,26 @@
 """Structured logging configuration for Chronicle."""
 
 from __future__ import annotations
+
+import json
 import logging
 import sys
-import json
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
-from datetime import datetime
+
 from chronicle.config import settings
+
+
+class ErrorCategory(str, Enum):
+    """Standardized error categories for consistent observability."""
+
+    API = "api"
+    DATABASE = "database"
+    NETWORK = "network"
+    NLP = "nlp"
+    CLUSTERING = "clustering"
+    SYSTEM = "system"
 
 
 class JSONFormatter(logging.Formatter):
@@ -14,8 +28,8 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        log_data = {
-            "timestamp": datetime.utcnow().isoformat(),
+        log_data: dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -24,29 +38,29 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
 
-        # Add exception info if present
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
 
-        # Add extra fields
-        if hasattr(record, "extra_data"):
-            log_data.update(record.extra_data)
+        extra_data = getattr(record, "extra_data", None)
+        if isinstance(extra_data, dict):
+            log_data.update(extra_data)
 
         return json.dumps(log_data)
 
 
 def setup_logging() -> logging.Logger:
-    """Configure logging for Chronicle."""
+    """Configure root Chronicle logger once and return it."""
     logger = logging.getLogger("chronicle")
 
-    # Remove existing handlers
-    logger.handlers.clear()
-
-    # Set level from config
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
     logger.setLevel(level)
 
-    # Create handler
+    if logger.handlers:
+        for existing_handler in logger.handlers:
+            existing_handler.setLevel(level)
+        return logger
+
+    handler: logging.Handler
     if settings.log_file:
         from pathlib import Path
 
@@ -54,11 +68,12 @@ def setup_logging() -> logging.Logger:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         handler = logging.FileHandler(settings.log_file)
     else:
-        handler = logging.StreamHandler(sys.stdout)
+        handler = logging.StreamHandler(sys.stderr)
 
-    # Set formatter
+    handler.setLevel(level)
+
     if settings.log_format == "json":
-        formatter = JSONFormatter()
+        formatter: logging.Formatter = JSONFormatter()
     else:
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -66,18 +81,53 @@ def setup_logging() -> logging.Logger:
 
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
-    # Don't propagate to root logger
     logger.propagate = False
-
     return logger
 
 
-# Global logger instance
+def get_logger(name: str) -> logging.Logger:
+    """Get a configured logger that inherits Chronicle handlers."""
+    base_logger = setup_logging()
+    logger = logging.getLogger(name)
+    logger.setLevel(base_logger.level)
+    logger.handlers = base_logger.handlers
+    logger.propagate = False
+    return logger
+
+
+def log_with_context(
+    logger: logging.Logger, level: str, message: str, **kwargs: Any
+) -> None:
+    """Log message with additional structured context."""
+    level_value = getattr(logging, level.upper(), logging.INFO)
+    if kwargs:
+        logger.log(level_value, message, extra={"extra_data": kwargs})
+    else:
+        logger.log(level_value, message)
+
+
+def log_metric(
+    logger: logging.Logger, name: str, value: float = 1.0, **tags: Any
+) -> None:
+    """Emit a lightweight metric event via structured logs."""
+    log_with_context(logger, "INFO", "metric", metric=name, value=value, **tags)
+
+
+def log_exception(
+    logger: logging.Logger,
+    category: ErrorCategory,
+    message: str,
+    exc: Exception,
+    **context: Any,
+) -> None:
+    """Log exceptions with standardized error taxonomy and context."""
+    extra_data = {"error_category": category.value, **context}
+    logger.error(
+        f"{message}: {exc}",
+        exc_info=(type(exc), exc, exc.__traceback__),
+        extra={"extra_data": extra_data},
+    )
+
+
+# Global logger instance for package-level use
 logger = setup_logging()
-
-
-def log_with_context(level: str, message: str, **kwargs: Any) -> None:
-    """Log message with additional context."""
-    extra_record = type("obj", (object,), {"extra_data": kwargs})()
-    getattr(logger, level.lower())(message, extra=extra_record)

@@ -1,12 +1,12 @@
 """Tests for clustering and deduplication algorithms."""
 
-import pytest
 import numpy as np
+
 from chronicle.cluster.algos import (
-    deduplicate,
-    cluster_embeddings,
-    minhash_signature,
     _shingles,
+    cluster_embeddings,
+    deduplicate,
+    minhash_signature,
 )
 
 
@@ -91,9 +91,9 @@ class TestClustering:
         # Create simple 2D embeddings with two clear clusters
         X = np.array(
             [
-                [0.0, 0.0],
-                [0.1, 0.1],
-                [0.0, 0.1],
+                [1.0, 1.0],
+                [1.1, 1.1],
+                [1.0, 1.1],
                 [10.0, 10.0],
                 [10.1, 10.0],
                 [10.0, 10.1],
@@ -104,9 +104,9 @@ class TestClustering:
         assert len(labels) == 6
         assert len(probs) == 6
 
-        # Should find at least 1 cluster (may mark some as noise with -1)
+        # Two separated groups of valid nonzero embeddings should form two clusters.
         unique_clusters = set(labels) - {-1}
-        assert len(unique_clusters) >= 1
+        assert len(unique_clusters) == 2
 
     def test_cluster_embeddings_single_cluster(self):
         """Test clustering with all similar points."""

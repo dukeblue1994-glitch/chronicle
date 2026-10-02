@@ -1,7 +1,7 @@
 """Tests for embedding functionality."""
 
-import pytest
 import numpy as np
+
 from chronicle.nlp.embedding import encode
 
 

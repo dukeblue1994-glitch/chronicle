@@ -1,6 +1,5 @@
 """Tests for database operations."""
 
-import pytest
 from chronicle.storage import db
 
 
@@ -42,6 +41,28 @@ class TestDatabase:
 
         assert len(ids) == len(sample_docs)
         assert len(set(ids)) == len(ids)  # All unique
+
+        conn.close()
+
+    def test_insert_doc_upserts_existing_external_id(self, temp_db, sample_docs):
+        """Test that insert_doc upserts by source/external_id."""
+        conn = db.connect()
+
+        original = sample_docs[0].copy()
+        doc_id_1 = db.insert_doc(conn, original)
+
+        updated = sample_docs[0].copy()
+        updated["title"] = "Updated title"
+        updated["text"] = "Updated text"
+        doc_id_2 = db.insert_doc(conn, updated)
+
+        assert doc_id_1 == doc_id_2
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM docs WHERE source=? AND external_id=?", ("test", "1")
+        )
+        assert cursor.fetchone()[0] == 1
 
         conn.close()
 

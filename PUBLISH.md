@@ -1,67 +1,38 @@
-# Publishing Chronicle to PyPI
+# Releasing Chronicle
 
-## Option 1: Local Manual Publishing (Easiest)
+PyPI accepts a new version number and valid distributions. Uploads cannot replace files from an existing release. Chronicle additionally requires passing CI before publication.
 
-1. **Install publishing tools:**
-   ```bash
-   pip install build twine
-   ```
+## Prepare
 
-2. **Build the package:**
-   ```bash
-   python -m build
-   ```
+1. Update `pyproject.toml`, `chronicle/__init__.py`, and the default application version in `chronicle/config.py` together.
+2. Add a versioned section to `CHANGELOG.md` and document compatibility changes.
+3. Run Ruff, Black, mypy, pytest, `python -m build`, and `twine check --strict dist/*`.
+4. Merge the reviewed changes after CI passes.
 
-3. **Upload to PyPI:**
-   ```bash
-   # First time: Create account at https://pypi.org/account/register/
-   # Get API token from https://pypi.org/manage/account/token/
-   
-   twine upload dist/*
-   # Enter username: __token__
-   # Enter password: <your-pypi-token>
-   ```
+## Publish through GitHub
 
-## Option 2: GitHub Trusted Publishing
+Create a GitHub release with a new `vX.Y.Z` tag at the verified commit. `publish.yml` validates metadata, reruns CI, builds and tests the distributions, then uploads those exact artifacts. It uses the existing `PI_PY_TOKEN` secret when configured, or PyPI Trusted Publishing when no token is configured.
 
-1. **Go to PyPI:**
-   - Visit: https://pypi.org/manage/account/publishing/
-   - Click "Add a new pending publisher"
+The existing PyPI project should trust:
 
-2. **Configure publisher:**
-   - PyPI Project Name: `chronicle-events`
-   - Owner: `dukeblue1994-glitch`
-   - Repository: `chronicle`
-   - Workflow: `publish.yml`
-   - Environment: `pypi`
+- Owner: `dukeblue1994-glitch`
+- Repository: `chronicle`
+- Workflow: `publish.yml`
+- Environment: `pypi`
 
-3. **Create a new release:**
-   ```bash
-   gh release create v0.1.1 --title "Chronicle v0.1.1" --notes "Release notes"
-   ```
+Manage this under the existing project's publishing settings. Pending publishers are for projects that do not exist yet.
 
-## Option 3: Manual Workflow with Token
+The manually dispatched **Publish to PyPI (Token fallback)** workflow also accepts an existing tag and uses the repository's existing `PI_PY_TOKEN` secret. It runs the same CI before uploading. Never put the token in source files or logs.
 
-1. **Get PyPI API token:**
-   - Go to https://pypi.org/manage/account/token/
-   - Create a token with upload permissions
+The two publishing workflows share a concurrency group. Do not dispatch both for the same version.
 
-2. **Add token to GitHub:**
-   - Go to: https://github.com/dukeblue1994-glitch/chronicle/settings/secrets/actions
-   - Click "New repository secret"
-   - Name: `PYPI_API_TOKEN`
-   - Value: `<your-token>`
+## Verify
 
-3. **Run workflow:**
-   - Go to: https://github.com/dukeblue1994-glitch/chronicle/actions/workflows/publish-manual.yml
-   - Click "Run workflow"
+Check the GitHub Actions publishing job and the exact version on [PyPI](https://pypi.org/project/chronicle-events/). Install from PyPI into a fresh environment, outside the source checkout, and confirm:
 
-## Verifying Publication
-
-After publishing, verify:
 ```bash
-pip install chronicle-events
-python -c "import chronicle; print(chronicle.__version__)"
+chronicle --version
+chronicle demo --db demo.db
 ```
 
-Check on PyPI: https://pypi.org/project/chronicle-events/
+The GitHub release alone is not evidence that PyPI accepted the upload.
