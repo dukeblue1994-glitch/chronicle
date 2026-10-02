@@ -25,6 +25,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,8 +51,25 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Prepare publishing authentication
+        id: credential
+        env:
+          PYPI_CREDENTIAL: ${{ secrets.PI_PY_TOKEN }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import re
+          token = os.environ.get("PYPI_CREDENTIAL", "").strip()
+          if re.fullmatch(r"pypi-[A-Za-z0-9_-]+={0,2}", token):
+              print(f"::add-mask::{token}")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+                  output.write(f"token={token}\n")
+              print("Using the configured PyPI token after whitespace normalization.")
+          else:
+              print("No valid PyPI token configured; using existing Trusted Publishing.")
+          PYTHON
       - name: Publish tested distributions using existing token
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PI_PY_TOKEN }}
-          attestations: false
+          password: ${{ steps.credential.outputs.token }}
+          attestations: ${{ steps.credential.outputs.token == '' }}
