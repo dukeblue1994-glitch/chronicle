@@ -131,7 +131,8 @@ def test_fallback_removes_small_groups(monkeypatch):
     labels, scores = algos.cluster_embeddings(vectors, min_cluster_size=2)
     assert labels[-1] == -1
     assert scores[-1] == 0
-    assert set(np.bincount(labels[labels >= 0])) == {2}
+    _, counts = np.unique(labels[labels >= 0], return_counts=True)
+    assert counts.tolist() == [2, 2]
 
 
 def test_zero_vectors_are_noise():
@@ -208,3 +209,25 @@ def test_readiness_reports_database_failure(temp_db, monkeypatch):
         db, "connect", Mock(side_effect=sqlite3.OperationalError("unavailable"))
     )
     assert TestClient(app).get("/ready").status_code == 503
+
+
+def test_offline_demo_creates_three_events(tmp_path, monkeypatch, capsys):
+    import json
+
+    from chronicle.cli import main
+
+    path = tmp_path / "demo.db"
+    monkeypatch.setattr(sys, "argv", ["chronicle", "demo", "--db", str(path)])
+    # Restore global state after the CLI invocation.
+    monkeypatch.setenv("CHRONICLE_DB_PATH", str(path))
+    monkeypatch.setattr(settings, "embedding_backend", "tfidf")
+    monkeypatch.setattr(settings, "dedup_threshold", settings.dedup_threshold)
+    monkeypatch.setattr(settings, "cluster_min_size", settings.cluster_min_size)
+    main()
+    stats = json.loads(capsys.readouterr().out)
+    assert stats["documents"] == 12
+    assert stats["events"] == 3
+    assert stats["clustered_documents"] == 12
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
